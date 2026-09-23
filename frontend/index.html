@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Jenkins Three Tier Application</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>Jenkins Three-Tier Application</h1>
+
+        <p class="subtitle">
+            Frontend → Backend → MySQL
+        </p>
+
+        <div class="card">
+
+            <h2>Add User</h2>
+
+            <input
+                type="text"
+                id="name"
+                placeholder="Enter name"
+            >
+
+            <input
+                type="email"
+                id="email"
+                placeholder="Enter email"
+            >
+
+            <button onclick="addUser()">
+                Add User
+            </button>
+
+            <p id="message"></p>
+
+        </div>
+
+        <div class="card">
+
+            <h2>Users</h2>
+
+            <button onclick="loadUsers()">
+                Refresh Users
+            </button>
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                    </tr>
+                </thead>
+
+                <tbody id="users">
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+
+</body>
+</html>
