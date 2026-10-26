@@ -10,7 +10,7 @@ pipeline {
         FRONTEND_DIR       = '/var/www/three-tier/frontend'
         BACKEND_DEPLOY_DIR = '/var/lib/jenkins/backend-deploy'
         DB_NAME            = 'three_tier_db'
-        DB_USER            = 'three_tier_user'
+        DB_USER            = 'root'
         BACKEND_PORT       = '5000'
     }
 
