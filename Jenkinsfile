@@ -57,18 +57,23 @@ pipeline {
                 echo 'Deploying database schema...'
 
                 withCredentials([
-    string(
-        credentialsId: 'three-tier-db-password',
-        variable: 'DB_PASSWORD'
-    )
-]) {
-    sh '''
-        set -eu
-        export MYSQL_PWD="$DB_PASSWORD"
-        mysql --user="$DB_USER" "$DB_NAME" < database/init.sql
-        unset MYSQL_PWD
-    '''
-}
+                    string(
+                        credentialsId: 'three-tier-db-password',
+                        variable: 'DB_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        set -eu
+
+                        export MYSQL_PWD="$DB_PASSWORD"
+
+                        mysql --user="$DB_USER" "$DB_NAME" \
+                            < database/init.sql
+
+                        unset MYSQL_PWD
+
+                        echo 'Database schema deployed successfully.'
+                    '''
                 }
             }
         }
@@ -110,11 +115,13 @@ pipeline {
                     set -eu
 
                     test -f frontend/index.html
+
                     mkdir -p "$FRONTEND_DIR"
 
                     cp -r frontend/. "$FRONTEND_DIR/"
 
                     echo 'Frontend deployment successful.'
+
                     ls -la "$FRONTEND_DIR"
                 '''
             }
