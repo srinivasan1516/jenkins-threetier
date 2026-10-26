@@ -57,27 +57,18 @@ pipeline {
                 echo 'Deploying database schema...'
 
                 withCredentials([
-                    string(
-                        credentialsId: 'three-tier-db-password',
-                        variable: 'DB_PASSWORD'
-                    )
-                ]) {
-                    sh '''
-                        set -eu
-
-                        test -f database/init.sql
-
-                        export MYSQL_PWD="$DB_PASSWORD"
-
-                        mysql \
-                            --user="$DB_USER" \
-                            "$DB_NAME" \
-                            < database/init.sql
-
-                        unset MYSQL_PWD
-
-                        echo 'Database deployment successful.'
-                    '''
+    string(
+        credentialsId: 'three-tier-db-password',
+        variable: 'DB_PASSWORD'
+    )
+]) {
+    sh '''
+        set -eu
+        export MYSQL_PWD="$DB_PASSWORD"
+        mysql --user="$DB_USER" "$DB_NAME" < database/init.sql
+        unset MYSQL_PWD
+    '''
+}
                 }
             }
         }
