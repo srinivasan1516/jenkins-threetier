@@ -2,11 +2,10 @@ pipeline {
     agent any
 
     environment {
-        FRONTEND_DIR = '/var/www/three-tier/frontend'
+        FRONTEND_DIR       = '/var/www/three-tier/frontend'
         BACKEND_DEPLOY_DIR = '/var/lib/jenkins/backend-deploy'
-        DB_NAME = 'three_tier_db'
-        DB_USER = 'three_tier_user'
-        DB_CREDENTIAL_ID = 'three-tier-db-password'
+        DB_NAME            = 'three_tier_db'
+        DB_USER            = 'three_tier_user'
     }
 
     stages {
@@ -50,6 +49,8 @@ pipeline {
                             --user="$DB_USER" \
                             "$DB_NAME" \
                             < database/init.sql
+
+                        echo 'Database schema deployment completed.'
                     '''
                 }
             }
@@ -57,7 +58,7 @@ pipeline {
 
         stage('Deploy Backend') {
             steps {
-                echo 'Deploying backend...'
+                echo 'Deploying backend application...'
 
                 sh '''
                     set -eu
@@ -78,6 +79,7 @@ pipeline {
                     fi
 
                     pm2 start server.js --name three-tier-backend
+
                     pm2 save
 
                     pm2 status
@@ -87,7 +89,7 @@ pipeline {
 
         stage('Deploy Frontend') {
             steps {
-                echo 'Deploying frontend...'
+                echo 'Deploying frontend application...'
 
                 sh '''
                     set -eu
@@ -98,21 +100,25 @@ pipeline {
 
                     cp -r frontend/. "$FRONTEND_DIR/"
 
-                    echo 'Frontend files deployed successfully.'
+                    echo 'Frontend deployment completed.'
+
                     ls -la "$FRONTEND_DIR"
                 '''
             }
         }
 
-        stage('Restart Nginx') {
+        stage('Validate and Reload Nginx') {
             steps {
-                echo 'Testing and reloading Nginx...'
+                echo 'Validating Nginx configuration...'
 
                 sh '''
                     set -eu
 
                     sudo nginx -t
+
                     sudo systemctl reload nginx
+
+                    echo 'Nginx reloaded successfully.'
                 '''
             }
         }
@@ -127,16 +133,19 @@ pipeline {
                     sleep 5
 
                     echo 'Checking backend health endpoint...'
+
                     curl --fail --show-error --max-time 10 \
                         http://127.0.0.1:5000/api/health
 
                     echo
                     echo 'Checking frontend through Nginx...'
+
                     curl --fail --show-error --max-time 10 \
                         http://127.0.0.1/
 
                     echo
                     echo 'Checking users API through Nginx...'
+
                     curl --fail --show-error --max-time 10 \
                         http://127.0.0.1/api/users
 
@@ -166,3 +175,4 @@ pipeline {
         }
     }
 }
+```
