@@ -58,7 +58,7 @@ pipeline {
 
                 withCredentials([
                     string(
-                        credentialsId: 'three-tier-db-password',
+                        credentialsId: 'mysql-password',
                         variable: 'DB_PASSWORD'
                     )
                 ]) {
