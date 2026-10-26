@@ -72,7 +72,6 @@ pipeline {
 
                         unset MYSQL_PWD
 
-                        echo 'Database schema deployed successfully.'
                     '''
                 }
             }
