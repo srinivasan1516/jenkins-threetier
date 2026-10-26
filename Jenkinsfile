@@ -6,6 +6,7 @@ pipeline {
         BACKEND_DEPLOY_DIR = '/var/lib/jenkins/backend-deploy'
         DB_NAME = 'three_tier_db'
         DB_USER = 'three_tier_user'
+        DB_CREDENTIAL_ID = 'three-tier-db-password'
     }
 
     stages {
@@ -20,9 +21,10 @@ pipeline {
         stage('Install Backend Dependencies') {
             steps {
                 echo 'Installing backend dependencies...'
+
                 dir('backend') {
                     sh '''
-                        set -e
+                        set -eu
                         npm install
                     '''
                 }
@@ -40,9 +42,13 @@ pipeline {
                     )
                 ]) {
                     sh '''
-                        set -e
+                        set -eu
+
+                        test -f database/init.sql
+
                         MYSQL_PWD="$DB_PASSWORD" mysql \
-                            -u "$DB_USER" "$DB_NAME" \
+                            --user="$DB_USER" \
+                            "$DB_NAME" \
                             < database/init.sql
                     '''
                 }
@@ -52,16 +58,19 @@ pipeline {
         stage('Deploy Backend') {
             steps {
                 echo 'Deploying backend...'
+
                 sh '''
-                    set -e
+                    set -eu
+
+                    test -f backend/server.js
+                    test -f backend/package.json
 
                     mkdir -p "$BACKEND_DEPLOY_DIR"
 
-                    cp backend/package.json "$BACKEND_DEPLOY_DIR/"
-                    cp backend/package-lock.json "$BACKEND_DEPLOY_DIR/"
-                    cp backend/server.js "$BACKEND_DEPLOY_DIR/"
+                    cp -r backend/. "$BACKEND_DEPLOY_DIR/"
 
                     cd "$BACKEND_DEPLOY_DIR"
+
                     npm install --omit=dev
 
                     if pm2 describe three-tier-backend >/dev/null 2>&1; then
@@ -70,6 +79,8 @@ pipeline {
 
                     pm2 start server.js --name three-tier-backend
                     pm2 save
+
+                    pm2 status
                 '''
             }
         }
@@ -77,18 +88,18 @@ pipeline {
         stage('Deploy Frontend') {
             steps {
                 echo 'Deploying frontend...'
+
                 sh '''
-                    set -e
+                    set -eu
 
                     test -f frontend/index.html
-                    test -f frontend/style.css
-                    test -f frontend/app.js
 
                     mkdir -p "$FRONTEND_DIR"
 
-                    cp frontend/index.html "$FRONTEND_DIR/"
-                    cp frontend/style.css "$FRONTEND_DIR/"
-                    cp frontend/app.js "$FRONTEND_DIR/"
+                    cp -r frontend/. "$FRONTEND_DIR/"
+
+                    echo 'Frontend files deployed successfully.'
+                    ls -la "$FRONTEND_DIR"
                 '''
             }
         }
@@ -96,8 +107,10 @@ pipeline {
         stage('Restart Nginx') {
             steps {
                 echo 'Testing and reloading Nginx...'
+
                 sh '''
-                    set -e
+                    set -eu
+
                     sudo nginx -t
                     sudo systemctl reload nginx
                 '''
@@ -107,14 +120,28 @@ pipeline {
         stage('Application Health Check') {
             steps {
                 echo 'Checking application health...'
+
                 sh '''
-                    set -e
+                    set -eu
+
                     sleep 5
 
-                    curl --fail --show-error http://127.0.0.1:5000/api/health
-                    curl --fail --show-error http://127.0.0.1/api/users
+                    echo 'Checking backend health endpoint...'
+                    curl --fail --show-error --max-time 10 \
+                        http://127.0.0.1:5000/api/health
 
-                    echo 'Application health checks passed.'
+                    echo
+                    echo 'Checking frontend through Nginx...'
+                    curl --fail --show-error --max-time 10 \
+                        http://127.0.0.1/
+
+                    echo
+                    echo 'Checking users API through Nginx...'
+                    curl --fail --show-error --max-time 10 \
+                        http://127.0.0.1/api/users
+
+                    echo
+                    echo 'All health checks passed.'
                 '''
             }
         }
@@ -122,16 +149,20 @@ pipeline {
 
     post {
         success {
-            echo '========================================='
-            echo 'THREE-TIER DEPLOYMENT SUCCESSFUL'
-            echo '========================================='
+            echo '''
+            =========================================
+            THREE-TIER DEPLOYMENT SUCCESSFUL
+            =========================================
+            '''
         }
 
         failure {
-            echo '========================================='
-            echo 'THREE-TIER DEPLOYMENT FAILED'
-            echo 'Check Console Output for the failed stage.'
-            echo '========================================='
+            echo '''
+            =========================================
+            THREE-TIER DEPLOYMENT FAILED
+            Check Console Output for the failed stage.
+            =========================================
+            '''
         }
     }
 }
