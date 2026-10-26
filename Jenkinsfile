@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -33,10 +32,20 @@ pipeline {
         stage('Database Deployment') {
             steps {
                 echo 'Deploying database schema...'
-                sh '''
-                    set -e
-                    mysql -u "$DB_USER" "$DB_NAME" < database/init.sql
-                '''
+
+                withCredentials([
+                    string(
+                        credentialsId: 'three-tier-db-password',
+                        variable: 'DB_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        set -e
+                        MYSQL_PWD="$DB_PASSWORD" mysql \
+                            -u "$DB_USER" "$DB_NAME" \
+                            < database/init.sql
+                    '''
+                }
             }
         }
 
@@ -55,7 +64,10 @@ pipeline {
                     cd "$BACKEND_DEPLOY_DIR"
                     npm install --omit=dev
 
-                    pm2 delete three-tier-backend || true
+                    if pm2 describe three-tier-backend >/dev/null 2>&1; then
+                        pm2 delete three-tier-backend
+                    fi
+
                     pm2 start server.js --name three-tier-backend
                     pm2 save
                 '''
@@ -101,6 +113,8 @@ pipeline {
 
                     curl --fail --show-error http://127.0.0.1:5000/api/health
                     curl --fail --show-error http://127.0.0.1/api/users
+
+                    echo 'Application health checks passed.'
                 '''
             }
         }
@@ -116,7 +130,7 @@ pipeline {
         failure {
             echo '========================================='
             echo 'THREE-TIER DEPLOYMENT FAILED'
-            echo 'Check the failed stage in Console Output.'
+            echo 'Check Console Output for the failed stage.'
             echo '========================================='
         }
     }
