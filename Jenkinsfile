@@ -25,8 +25,6 @@ pipeline {
 
         stage('Validate Project Files') {
             steps {
-                echo 'Validating project structure...'
-
                 sh '''
                     set -eu
 
@@ -36,7 +34,7 @@ pipeline {
                     test -f backend/package.json
                     test -f frontend/index.html
 
-                    echo 'All required project files exist.'
+                    echo 'Project files validated.'
                 '''
             }
         }
@@ -67,6 +65,8 @@ pipeline {
                     sh '''
                         set -eu
 
+                        test -f database/init.sql
+
                         export MYSQL_PWD="$DB_PASSWORD"
 
                         mysql \
@@ -76,7 +76,7 @@ pipeline {
 
                         unset MYSQL_PWD
 
-                        echo 'Database schema deployment completed.'
+                        echo 'Database deployment successful.'
                     '''
                 }
             }
@@ -84,7 +84,7 @@ pipeline {
 
         stage('Deploy Backend') {
             steps {
-                echo 'Deploying backend application...'
+                echo 'Deploying backend...'
 
                 sh '''
                     set -eu
@@ -113,17 +113,17 @@ pipeline {
 
         stage('Deploy Frontend') {
             steps {
-                echo 'Deploying frontend application...'
+                echo 'Deploying frontend...'
 
                 sh '''
                     set -eu
 
+                    test -f frontend/index.html
                     mkdir -p "$FRONTEND_DIR"
 
                     cp -r frontend/. "$FRONTEND_DIR/"
 
-                    echo 'Frontend files deployed successfully.'
-
+                    echo 'Frontend deployment successful.'
                     ls -la "$FRONTEND_DIR"
                 '''
             }
@@ -131,48 +131,47 @@ pipeline {
 
         stage('Validate and Reload Nginx') {
             steps {
-                echo 'Validating and reloading Nginx...'
+                echo 'Validating Nginx...'
 
                 sh '''
                     set -eu
 
                     sudo nginx -t
-
                     sudo systemctl reload nginx
 
-                    echo 'Nginx reloaded successfully.'
+                    echo 'Nginx reload successful.'
                 '''
             }
         }
 
         stage('Application Health Check') {
             steps {
-                echo 'Checking application health...'
+                echo 'Checking deployed application...'
 
                 sh '''
                     set -eu
 
                     sleep 5
 
-                    echo 'Checking backend process...'
-                    pm2 describe three-tier-backend
+                    echo 'Checking backend health...'
 
-                    echo 'Checking backend health endpoint...'
                     curl --fail --show-error --max-time 10 \
-                        http://127.0.0.1:${BACKEND_PORT}/api/health
+                        "http://127.0.0.1:${BACKEND_PORT}/api/health"
 
                     echo
-                    echo 'Checking frontend through Nginx...'
+                    echo 'Checking frontend...'
+
                     curl --fail --show-error --max-time 10 \
                         http://127.0.0.1/
 
                     echo
-                    echo 'Checking users API through Nginx...'
+                    echo 'Checking users API...'
+
                     curl --fail --show-error --max-time 10 \
                         http://127.0.0.1/api/users
 
                     echo
-                    echo 'All application health checks passed.'
+                    echo 'All health checks passed.'
                 '''
             }
         }
@@ -180,24 +179,15 @@ pipeline {
 
     post {
         success {
-            echo '''
-            =========================================
-            THREE-TIER DEPLOYMENT SUCCESSFUL
-            =========================================
-            '''
+            echo 'THREE-TIER DEPLOYMENT SUCCESSFUL'
         }
 
         failure {
-            echo '''
-            =========================================
-            THREE-TIER DEPLOYMENT FAILED
-            Check Console Output for the failed stage.
-            =========================================
-            '''
+            echo 'THREE-TIER DEPLOYMENT FAILED. Check Console Output.'
         }
 
         always {
-            echo 'Jenkins pipeline execution completed.'
+            echo 'Pipeline execution completed.'
         }
     }
 }
