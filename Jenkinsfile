@@ -1,11 +1,17 @@
 pipeline {
     agent any
 
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+    }
+
     environment {
         FRONTEND_DIR       = '/var/www/three-tier/frontend'
         BACKEND_DEPLOY_DIR = '/var/lib/jenkins/backend-deploy'
         DB_NAME            = 'three_tier_db'
         DB_USER            = 'three_tier_user'
+        BACKEND_PORT       = '5000'
     }
 
     stages {
@@ -14,6 +20,24 @@ pipeline {
             steps {
                 echo 'Checking out source code...'
                 checkout scm
+            }
+        }
+
+        stage('Validate Project Files') {
+            steps {
+                echo 'Validating project structure...'
+
+                sh '''
+                    set -eu
+
+                    test -f Jenkinsfile
+                    test -f database/init.sql
+                    test -f backend/server.js
+                    test -f backend/package.json
+                    test -f frontend/index.html
+
+                    echo 'All required project files exist.'
+                '''
             }
         }
 
@@ -43,12 +67,14 @@ pipeline {
                     sh '''
                         set -eu
 
-                        test -f database/init.sql
+                        export MYSQL_PWD="$DB_PASSWORD"
 
-                        MYSQL_PWD="$DB_PASSWORD" mysql \
+                        mysql \
                             --user="$DB_USER" \
                             "$DB_NAME" \
                             < database/init.sql
+
+                        unset MYSQL_PWD
 
                         echo 'Database schema deployment completed.'
                     '''
@@ -63,9 +89,6 @@ pipeline {
                 sh '''
                     set -eu
 
-                    test -f backend/server.js
-                    test -f backend/package.json
-
                     mkdir -p "$BACKEND_DEPLOY_DIR"
 
                     cp -r backend/. "$BACKEND_DEPLOY_DIR/"
@@ -78,7 +101,8 @@ pipeline {
                         pm2 delete three-tier-backend
                     fi
 
-                    pm2 start server.js --name three-tier-backend
+                    pm2 start server.js \
+                        --name three-tier-backend
 
                     pm2 save
 
@@ -94,13 +118,11 @@ pipeline {
                 sh '''
                     set -eu
 
-                    test -f frontend/index.html
-
                     mkdir -p "$FRONTEND_DIR"
 
                     cp -r frontend/. "$FRONTEND_DIR/"
 
-                    echo 'Frontend deployment completed.'
+                    echo 'Frontend files deployed successfully.'
 
                     ls -la "$FRONTEND_DIR"
                 '''
@@ -109,7 +131,7 @@ pipeline {
 
         stage('Validate and Reload Nginx') {
             steps {
-                echo 'Validating Nginx configuration...'
+                echo 'Validating and reloading Nginx...'
 
                 sh '''
                     set -eu
@@ -132,25 +154,25 @@ pipeline {
 
                     sleep 5
 
-                    echo 'Checking backend health endpoint...'
+                    echo 'Checking backend process...'
+                    pm2 describe three-tier-backend
 
+                    echo 'Checking backend health endpoint...'
                     curl --fail --show-error --max-time 10 \
-                        http://127.0.0.1:5000/api/health
+                        http://127.0.0.1:${BACKEND_PORT}/api/health
 
                     echo
                     echo 'Checking frontend through Nginx...'
-
                     curl --fail --show-error --max-time 10 \
                         http://127.0.0.1/
 
                     echo
                     echo 'Checking users API through Nginx...'
-
                     curl --fail --show-error --max-time 10 \
                         http://127.0.0.1/api/users
 
                     echo
-                    echo 'All health checks passed.'
+                    echo 'All application health checks passed.'
                 '''
             }
         }
@@ -172,6 +194,10 @@ pipeline {
             Check Console Output for the failed stage.
             =========================================
             '''
+        }
+
+        always {
+            echo 'Jenkins pipeline execution completed.'
         }
     }
 }
